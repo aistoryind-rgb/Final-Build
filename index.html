@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LifeInvader EN3 Advertisement Editor</title>
+    <meta name="description" content="Official EN3 LifeInvader Internal Advertisement processing and validation tool for GTA 5 Grand RP.">
+    <script>
+        // Safe localStorage and sessionStorage shadowing for incognito mode and storage-restricted environments
+        var localStorage;
+        var sessionStorage;
+        try {
+            localStorage = window.localStorage;
+            localStorage.getItem('__storage_test__');
+        } catch (e) {
+            var mockStorage = {};
+            localStorage = {
+                getItem: function(key) { return key in mockStorage ? mockStorage[key] : null; },
+                setItem: function(key, value) { mockStorage[key] = String(value); },
+                removeItem: function(key) { delete mockStorage[key]; },
+                clear: function() { mockStorage = {}; },
+                key: function(i) { return Object.keys(mockStorage)[i] || null; },
+                get length() { return Object.keys(mockStorage).length; }
+            };
+        }
+
+        try {
+            sessionStorage = window.sessionStorage;
+            sessionStorage.getItem('__storage_test__');
+        } catch (e) {
+            var mockSession = {};
+            sessionStorage = {
+                getItem: function(key) { return key in mockSession ? mockSession[key] : null; },
+                setItem: function(key, value) { mockSession[key] = String(value); },
+                removeItem: function(key) { delete mockSession[key]; },
+                clear: function() { mockSession = {}; },
+                key: function(i) { return Object.keys(mockSession)[i] || null; },
+                get length() { return Object.keys(mockSession).length; }
+            };
+        }
+
+
+        // Inline check to prevent flashing and protect content before render
+        (function() {
+            var token = localStorage.getItem("li_approved_token");
+            if (token === "APPROVED") {
+                document.documentElement.classList.add("user-approved");
+            } else {
+                document.documentElement.classList.add("user-unauthorized");
+            }
+        })();
+    </script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Premium Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="css/styles.css">
+    <!-- Icons -->
+    <link rel="icon" type="image/svg+xml" href="icon.svg">
+    
+    <!-- Firebase SDK Compat -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
+</head>
+<body>
+    <!-- Access Control Gate Overlay -->
+    <div id="access-gate" class="access-gate-overlay">
+        <div class="access-gate-card">
+            <div class="access-gate-header">
+                <div class="li-logo pulsing">
+                    <span class="li-text-l"><span class="li-letter">L</span><span class="li-letter">i</span><span class="li-letter">f</span><span class="li-letter">e</span></span><span class="li-text-i"><span class="li-letter">I</span><span class="li-letter">n</span><span class="li-letter">v</span><span class="li-letter">a</span><span class="li-letter">d</span><span class="li-letter">e</span><span class="li-letter">r</span></span>
+                </div>
+                <div class="access-gate-badge">GRP Security Gate</div>
+            </div>
+            
+            <!-- Screen 1: Request Access -->
+            <div id="access-screen-request" class="access-screen active">
+                <h3>Request Access Credentials</h3>
+                <p class="access-desc">This system is restricted to authorized employees. Please fill out the form below to request access approval.</p>
+                
+                <div class="form-row">
+                    <div class="form-group col-12">
+                        <label for="access-id">In-Game ID</label>
+                        <input type="text" id="access-id" placeholder="e.g. 12345" required>
+                    </div>
+                </div>
+                
+                <div class="form-row hide" id="access-name-row" style="margin-top: 15px;">
+                    <div class="form-group col-6">
+                        <label for="access-firstname">First Name</label>
+                        <input type="text" id="access-firstname" placeholder="John" required>
+                    </div>
+                    <div class="form-group col-6">
+                        <label for="access-lastname">Last Name</label>
+                        <input type="text" id="access-lastname" placeholder="Doe" required>
+                    </div>
+                </div>
+                
+                <button type="button" id="btn-access-request-submit" class="btn-action" style="margin-top: 20px;">
+                    <i class="fa-solid fa-key"></i> Verify & Enter
+                </button>
+
+                <div class="access-footer">
+                    <div style="display: flex; justify-content: center; width: 100%;">
+                        <span id="access-admin-toggle-1" class="access-settings-toggle">
+                            <i class="fa-solid fa-shield-halved"></i> Admin Login
+                        </span>
+                    </div>
+                    <div id="access-admin-drawer-1" class="access-settings-drawer hide">
+                        <label for="access-admin-key-1">Enter Admin Key</label>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="password" id="access-admin-key-1" placeholder="Enter global admin key" style="flex-grow: 1;">
+                            <button type="button" id="btn-access-admin-submit-1" class="btn-action glow-green" style="width: 44px; padding: 0; flex-shrink: 0;">
+                                <i class="fa-solid fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Screen 2: Awaiting Approval -->
+            <div id="access-screen-approve" class="access-screen">
+                <h3>Awaiting Admin Approval</h3>
+                <p class="access-desc" style="text-align: center; margin-bottom: 20px;">Your request has been submitted to the administrator. Once approved, the system will unlock automatically. In the meantime, you can check the status below.</p>
+                
+                <div class="status-box" style="background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.08); padding: 16px 20px; border-radius: var(--radius-md); text-align: center; margin-bottom: 20px; width: 100%; box-shadow: inset 0 1px 1px rgba(0,0,0,0.2);">
+                    <div style="font-family: var(--font-heading); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted);">Current Request Status</div>
+                    <div id="access-status-text" style="font-family: var(--font-heading); font-size: 16px; font-weight: 700; color: #ff9f0a; margin-top: 6px; text-shadow: 0 0 10px rgba(255, 159, 10, 0.2);">
+                        <i class="fa-solid fa-hourglass-half"></i> Pending Approval
+                    </div>
+                </div>
+                
+                <button type="button" id="btn-access-check-status" class="btn-action">
+                    <i class="fa-solid fa-arrows-rotate"></i> Check Status
+                </button>
+                
+                <div class="access-footer">
+                    <div style="display: flex; gap: 16px; justify-content: center; width: 100%; align-items: center; flex-wrap: wrap;">
+                        <button type="button" id="btn-access-go-back" class="btn-link" style="margin-top: 0; padding: 0;">
+                            <i class="fa-solid fa-arrow-left"></i> Change Request Details
+                        </button>
+                        <span id="access-admin-toggle-2" class="access-settings-toggle">
+                            <i class="fa-solid fa-shield-halved"></i> Admin Login
+                        </span>
+                    </div>
+                    <div id="access-admin-drawer-2" class="access-settings-drawer hide" style="width: 100%;">
+                        <label for="access-admin-key-2">Enter Admin Key</label>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="password" id="access-admin-key-2" placeholder="Enter global admin key" style="flex-grow: 1;">
+                            <button type="button" id="btn-access-admin-submit-2" class="btn-action glow-green" style="width: 44px; padding: 0; flex-shrink: 0;">
+                                <i class="fa-solid fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Picture-in-Picture Active Overlay -->
+    <div id="pip-active-overlay" class="pip-active-overlay hide">
+        <div class="pip-overlay-card">
+            <div class="li-logo">
+                <span class="li-text-l"><span class="li-letter">L</span><span class="li-letter">i</span><span class="li-letter">f</span><span class="li-letter">e</span></span><span class="li-text-i"><span class="li-letter">I</span><span class="li-letter">n</span><span class="li-letter">v</span><span class="li-letter">a</span><span class="li-letter">d</span><span class="li-letter">e</span><span class="li-letter">r</span></span>
+            </div>
+            <div id="pip-overlay-badge" class="pip-overlay-badge"><span class="pulse-dot"></span>Magic Editor Active</div>
+            <p id="pip-overlay-text" class="pip-overlay-text">Magic Editor Mode is currently active and will remain floating above other windows for quick access.</p>
+            <div class="pip-overlay-note">
+                <div class="note-header">
+                    <i id="pip-overlay-note-icon" class="fa-solid fa-graduation-cap"></i>
+                    <span id="pip-overlay-note-title">Editor's Career Guide</span>
+                </div>
+                <p id="pip-overlay-note-lead" class="guide-lead">Everyone makes mistakes, which is why it's always a good idea to review your advertisement <span style="color: #30d158; font-weight: 700;">two</span> or <span style="color: #ff453a; font-weight: 700;">three times</span> before publishing.</p>
+                <p id="pip-overlay-note-warning" class="guide-warning"><i id="pip-overlay-note-warning-icon" class="fa-solid fa-circle-exclamation"></i> This website is here to help, but any verbal warnings, strikes, or penalties received from a published advertisement are ultimately the responsibility of the publisher. 🚀</p>
+                <div id="pip-overlay-pro-stats" class="hide" style="margin-top: 8px; padding-top: 10px; border-top: 1px dashed rgba(192, 132, 252, 0.2); display: flex; justify-content: space-around; gap: 8px; width: 100%; box-sizing: border-box;"></div>
+            </div>
+            <button id="btn-restore-main" class="btn-preset btn-restore-main">
+                <i class="fa-solid fa-window-restore"></i> Return to Main Window
+            </button>
+            <div class="pip-overlay-footnote">
+                <i class="fa-solid fa-circle-exclamation"></i>
+                <span>You can safely minimize this window, Closing this tab will shut down Magic Editor.</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="app-container">
+        <!-- Sidebar Branding -->
+        <header class="app-header">
+            <div class="logo-container">
+                <div class="li-logo" id="li-logo">
+                    <span class="li-text-l"><span class="li-letter">L</span><span class="li-letter">i</span><span class="li-letter">f</span><span class="li-letter">e</span></span><span class="li-text-i"><span class="li-letter">I</span><span class="li-letter">n</span><span class="li-letter">v</span><span class="li-letter">a</span><span class="li-letter">d</span><span class="li-letter">e</span><span class="li-letter">r</span></span>
+                </div>
+                <div class="badge-en3">EN3 OFFICIAL</div>
+            </div>
+            <div class="header-desc-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;">
+                <div class="header-desc">INTERNAL POLICY AD PROCESSING SYSTEM</div>
+                <div class="created-by">Created by Dopamine</div>
+                <div class="last-updated" id="last-updated-main" style="font-family: var(--font-heading); font-size: 9px; color: rgba(255, 255, 255, 0.35); letter-spacing: 1px; text-transform: uppercase; font-weight: 500; text-shadow: 0 0 4px rgba(255, 59, 48, 0.1);"></div>
+            </div>
+            <div class="header-actions">
+                <button id="btn-float-pip" class="btn-header-action" title="Open floating always-on-top Magic Editor Mode window for Windows 10/11">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Magic Editor Mode
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content Layout -->
+        <main class="app-main">
+            <!-- Processing Workspace -->
+            <div class="editor-grid">
+                <!-- Left: Raw Input Area -->
+                <section class="panel input-panel">
+                    <div class="panel-header">
+                        <i class="fa-solid fa-file-pen panel-icon"></i>
+                        <h2>Raw Advertisement</h2>
+                    </div>
+                    <div class="panel-body">
+                        <!-- Raw Ad Form -->
+                        <div class="form-group">
+                            <label for="raw-ad"><i class="fa-solid fa-file-import"></i> Paste Advertisement Content</label>
+                            <div class="autocomplete-container">
+                                <textarea id="raw-ad" placeholder="e.g. buying fully upgraded sandking xl 12m budget negotiable or trade for obay r8..."></textarea>
+                                <div class="autocomplete-suggestions" id="raw-ad-suggestions"></div>
+                            </div>
+                            <div class="processed-action-row">
+                                <button type="button" id="btn-clear-raw" class="btn-clear">
+                                    <i class="fa-solid fa-trash-can"></i> Clear
+                                </button>
+                                <button type="button" id="btn-paste-raw" class="btn-paste">
+                                    <i class="fa-solid fa-paste"></i> Paste
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group col-6">
+                                <label>Action Mode</label>
+                                <div class="action-toggle-group" id="action-toggle-group">
+                                    <button type="button" class="btn-toggle active" id="btn-toggle-sell" data-action="Selling">
+                                        <i class="fa-solid fa-tags"></i> Sell
+                                    </button>
+                                    <button type="button" class="btn-toggle" id="btn-toggle-buy" data-action="Buying">
+                                        <i class="fa-solid fa-cart-shopping"></i> Buy
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="form-group col-6">
+                                <label for="category-override">Category Override</label>
+                                <select id="category-override">
+                                    <option value="auto">Auto-Detect Category</option>
+                                    <option value="Real Estate">Real Estate</option>
+                                    <option value="Auto">Auto</option>
+                                    <option value="Businesses">Businesses</option>
+                                    <option value="Work">Work</option>
+                                    <option value="Dating">Dating</option>
+                                    <option value="Services">Services</option>
+                                    <option value="Discounts">Discounts</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Quick Test Presets -->
+                        <div class="presets-section">
+                            <h3><i class="fa-solid fa-wand-magic-sparkles"></i> Most Used Advertisements</h3>
+                            <div class="preset-buttons">
+                                <button type="button" class="btn-preset" data-ad="selling 10 rp tickets for 350k each" title="Selling 10 Grand tickets at $350k each">Sell: 10 Grand Tickets</button>
+                                <button type="button" class="btn-preset" data-ad="buying prime platinum 30 days" title="Buying Prime Platinum with 30 days">Buy: Prime Platinum</button>
+                                <button type="button" class="btn-preset" data-ad="selling truffade chiron full config drift" title="Selling Chiron with full configuration and drift kit">Auto: Truffade Chiron</button>
+                                <button type="button" class="btn-preset" data-ad="selling house 1406 with helipad garden pool in vinewood hills" title="Selling house №1406 with garden, helipad and pool">RE: Vinewood House</button>
+                                <button type="button" class="btn-preset" data-ad="loking for girlfirnd" title="Looking for a girlfriend (auto-correcting typos)">Dating: Girlfriend</button>
+                                <button type="button" class="btn-preset" data-ad="selling 10% and 20% juices" title="Selling 10% and 20% juices in bulk">Other: Juices Bulk</button>
+                                <button type="button" class="btn-preset" data-ad="buying scrap metal" title="Buying scrap metal">Other: Scrap Metal</button>
+                                <button type="button" class="btn-preset" data-ad="looking to play dice" title="Looking to play dice">Other: Play Dice</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Right: Processed Output & Audit Logs -->
+                <section class="panel output-panel">
+                    <div class="panel-header">
+                        <i class="fa-solid fa-square-poll-vertical panel-icon"></i>
+                        <h2>Processed Output</h2>
+                    </div>
+                    <div class="panel-body">
+                        <!-- Final Processed Advertisement Display -->
+                        <div class="form-group">
+                            <label><i class="fa-solid fa-bullhorn"></i> Final Advertisement Text</label>
+                            <div class="processed-container">
+                                <div class="processed-text-wrapper">
+                                    <div id="processed-ad-text" class="processed-text placeholder" contenteditable="true" spellcheck="false">Processed ad will appear here...</div>
+                                </div>
+                            </div>
+                            <div class="processed-action-row" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                                <button id="btn-copy-ad" class="btn-copy" disabled>
+                                    <i class="fa-solid fa-copy"></i> Copy
+                                </button>
+                                <button type="button" id="btn-gemini-assist" class="btn-spark-ai magic-mode" style="display: none;" disabled>
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i> Spark
+                                </button>
+
+                                <button id="btn-submit-bug-inline" class="btn-action glow-red hide" style="max-width: 140px; margin-top: 0; padding: 6px 14px; font-size: 11px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-radius: 6px; font-weight: 700; height: 32px; text-transform: uppercase; margin-left: auto;">
+                                    <i class="fa-solid fa-paper-plane"></i> Submit Bug
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Status Flag Badge -->
+                        <div class="status-banner" id="ad-status-banner" data-status="pending">
+                            <span class="status-icon"><i class="fa-solid fa-hourglass-half"></i></span>
+                            <span class="status-title">Awaiting Input...</span>
+                        </div>
+
+                        <!-- Rejection & Blacklist Feedbacks -->
+                        <div class="notice-container hide" id="rejection-container">
+                            <div class="notice-box rejection">
+                                <div class="notice-header" style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <i class="fa-solid fa-circle-xmark"></i> Rejection Reason
+                                    </div>
+                                    <button id="btn-copy-rejection" class="btn-copy hide" style="padding: 4px 8px; font-size: 11px;">
+                                        <i class="fa-solid fa-copy"></i> Copy Reason
+                                    </button>
+                                </div>
+                                <div class="notice-body" id="rejection-reason-text">
+                                    Why the ad was rejected.
+                                </div>
+                                <!-- Actionable Help and AI Fix recommendations -->
+                                <div class="policy-helper-card hide" id="rejection-policy-helper">
+                                    <div class="policy-helper-desc" id="rejection-policy-helper-desc">
+                                        According to the handbook, this format is rejected.
+                                    </div>
+                                    <div class="policy-helper-action-row">
+                                        <button type="button" class="btn-policy-fix" id="btn-rejection-policy-fix">Auto-Fix Ad</button>
+                                        <a href="#" class="btn-policy-link" id="btn-rejection-policy-link">Open Handbook</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="notice-container hide" id="blacklist-container">
+                            <div class="notice-box blacklist">
+                                <div class="notice-header">
+                                    <i class="fa-solid fa-hand-fist"></i> Blacklist Warning
+                                </div>
+                                <div class="notice-body" id="blacklist-reason-text">
+                                    Details about the phone blacklist trigger.
+                                </div>
+                                <!-- Actionable Help and AI Fix recommendations -->
+                                <div class="policy-helper-card hide" id="blacklist-policy-helper">
+                                    <div class="policy-helper-desc" id="blacklist-policy-helper-desc">
+                                        Advertising this item is prohibited.
+                                    </div>
+                                    <div class="policy-helper-action-row">
+                                        <button type="button" class="btn-policy-fix" id="btn-blacklist-policy-fix">Auto-Fix Ad</button>
+                                        <a href="#" class="btn-policy-link" id="btn-blacklist-policy-link">Open Handbook</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Applied Rules & Auto-corrections logs -->
+                        <div class="audit-logs-container">
+                            <div class="audit-logs-row" style="display: flex; gap: 16px; align-items: flex-start; margin-top: 8px;">
+                                <!-- Left Column: Game Category Guide -->
+                                <div class="main-category-side" style="flex: 1; min-width: 0;">
+                                    <div style="font-family: 'Outfit', sans-serif; font-size: 10px; font-weight: 700; color: #8e8e93; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                                        <i class="fa-solid fa-folder-open"></i> Game Category Guide
+                                    </div>
+                                    <div class="main-category-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+                                        <div class="category-btn main-category-btn" data-category="Real Estate">
+                                            <i class="fa-solid fa-house"></i> Real Estate
+                                        </div>
+                                        <div class="category-btn main-category-btn" data-category="Auto">
+                                            <i class="fa-solid fa-car"></i> Auto
+                                        </div>
+                                        <div class="category-btn main-category-btn" data-category="Businesses">
+                                            <i class="fa-solid fa-briefcase"></i> Businesses
+                                        </div>
+                                        <div class="category-btn main-category-btn" data-category="Discounts">
+                                            <i class="fa-solid fa-percent"></i> Discounts
+                                        </div>
+                                        <div class="category-btn main-category-btn" data-category="Work">
+                                            <i class="fa-solid fa-helmet-safety"></i> Work
+                                        </div>
+                                        <div class="category-btn main-category-btn" data-category="Dating">
+                                            <i class="fa-solid fa-heart"></i> Dating
+                                        </div>
+                                        <div class="category-btn main-category-btn" data-category="Services">
+                                            <i class="fa-solid fa-wrench"></i> Services
+                                        </div>
+                                        <div class="category-btn main-category-btn" data-category="Other">
+                                            <i class="fa-solid fa-infinity"></i> Other
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Right Column: Rules List -->
+                                <div class="audit-logs-side" style="flex: 1.2; min-width: 0;">
+                                    <div style="font-family: 'Outfit', sans-serif; font-size: 10px; font-weight: 700; color: #8e8e93; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                                        <i class="fa-solid fa-list-check"></i> Applied Policy Rules &amp; Corrections
+                                    </div>
+                                    <ul class="audit-logs" id="audit-logs-list" style="margin: 0; padding: 12px 16px; background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border-color); border-radius: var(--radius-md); list-style: none; height: 118px; box-sizing: border-box;">
+                                        <li class="log-empty">No logs available. Enter some text to see corrections.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Tabs Section: Database Explorer & Policy Guide -->
+            <section class="panel tabs-panel">
+                <!-- Tab Controls -->
+                <div class="tabs-header">
+                    <button class="tab-btn active" data-tab="tab-db">
+                        <i class="fa-solid fa-database"></i> Database Explorer
+                    </button>
+                    <button class="tab-btn" data-tab="tab-book">
+                        <i class="fa-solid fa-book-open"></i> Policy Book
+                    </button>
+                    <button class="tab-btn" data-tab="tab-admin" id="tab-btn-admin">
+                        <i class="fa-solid fa-user-shield"></i> Admin Panel
+                    </button>
+                    <button class="tab-btn" data-tab="tab-bug-triage" id="tab-btn-bug-triage">
+                        <i class="fa-solid fa-bug" style="color: #ff453a; margin-right: 4px;"></i> Bug reports
+                    </button>
+                    <button class="tab-btn" data-tab="tab-translations" id="tab-btn-translations">
+                        <i class="fa-solid fa-square-check"></i> Fixed Bug
+                    </button>
+                    <button class="tab-btn" data-tab="tab-contact" id="tab-btn-contact">
+                        <i class="fa-solid fa-envelope"></i> Get in Touch & Credits
+                    </button>
+                </div>
+
+                <!-- Tab Contents -->
+                <div class="tabs-body">
+                    <!-- Tab 1: Database Explorer -->
+                    <div class="tab-content active" id="tab-db">
+                        <div class="search-bar-container">
+                            <div class="search-input-wrapper">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                                <input type="text" id="db-search-input" placeholder="Search vehicles, clothing, items, businesses...">
+                            </div>
+                            <div class="db-filters">
+                                <button class="filter-btn active" data-filter="all">All</button>
+                                <button class="filter-btn" data-filter="vehicles">Vehicles</button>
+                                <button class="filter-btn" data-filter="clothing">Clothing</button>
+                                <button class="filter-btn" data-filter="items">Items</button>
+                                <button class="filter-btn" data-filter="businesses">Businesses</button>
+                            </div>
+                        </div>
+                        <div class="db-results-grid" id="db-results">
+                            <!-- JS will inject dynamic database sections -->
+                        </div>
+                    </div>
+                    <!-- Tab: Policy Book & Rules -->
+                    <div class="tab-content" id="tab-book">
+                        <div class="policy-card policy-book-card" style="width: 100%; box-sizing: border-box;">
+                            <div class="book-header-wrapper">
+                                <h3><i class="fa-solid fa-book-open text-primary"></i> <span id="policy-book-title">Policy Reference Book</span></h3>
+                                <div style="display: flex; gap: 8px; align-items: center;">
+
+                                    <div class="book-search-box">
+                                        <i class="fa-solid fa-magnifying-glass"></i>
+                                        <input type="text" id="book-search-input" placeholder="Search policy...">
+                                        <button type="button" id="book-search-clear" class="clear-btn">&times;</button>
+                                    </div>
+                                </div>
+                            </div>
+
+
+
+                            <div class="book-container">
+                                <div class="book-pages-wrapper">
+                                    <div class="book-page left-page">
+                                        <h4 id="left-page-title" class="page-title-header">Page Title</h4>
+                                        <div id="left-page-content" class="page-content-body">
+                                            <!-- Dynamic content -->
+                                        </div>
+                                    </div>
+                                    <div class="book-divider-line"></div>
+                                    <div class="book-page right-page">
+                                        <h4 id="right-page-title" class="page-title-header">Page Title</h4>
+                                        <div id="right-page-content" class="page-content-body">
+                                            <!-- Dynamic content -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="book-footer">
+                                <button id="book-prev-btn" class="book-nav-btn"><i class="fa-solid fa-chevron-left"></i> Prev</button>
+                                <span id="book-page-indicator">Pages 1-2 of 51</span>
+                                <button id="book-next-btn" class="book-nav-btn">Next <i class="fa-solid fa-chevron-right"></i></button>
+                            </div>
+
+                            <!-- Decorative Divider Line -->
+                            <div style="margin: 30px 0 20px 0; border-top: 1px dashed rgba(255, 255, 255, 0.1); width: 100%;"></div>
+
+                            <!-- Important Rules Quick Guide (Visible on Scroll) -->
+                            <div id="quick-rules-container" style="background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 15px; margin-top: 10px; transition: all 0.3s ease;">
+                                <div style="font-family: var(--font-heading); font-size: 11px; font-weight: 700; color: #ff453a; letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 15px; display: flex; align-items: center; gap: 6px;">
+                                    <i class="fa-solid fa-circle-exclamation"></i> LifeInvader Important Quick Rules
+                                </div>
+                                <div class="policy-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px;">
+                                    <div class="policy-card" style="background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.04); border-radius: 6px; padding: 12px; box-sizing: border-box;">
+                                        <h3 style="margin-top:0; font-size:12.5px; color:#ff453a; display:flex; align-items:center; gap:6px; font-family:var(--font-heading); font-weight:700;"><i class="fa-solid fa-ban"></i> Illegal Items</h3>
+                                        <ul style="margin:8px 0 0 0; padding-left:16px; font-size:11px; color:var(--text-secondary); line-height:1.4;">
+                                            <li>Firearms &amp; Ammunition of any kind</li>
+                                            <li>Bulletproof vests / Dark armored vests</li>
+                                            <li>Weed, cannabis seeds/trees, drugs, cocaine</li>
+                                            <li>EMS surgical/medical masks</li>
+                                            <li>Vehicle &amp; people scanners (radars)</li>
+                                            <li>Balaclava masks, Ropes, Lock picks</li>
+                                            <li>USB virus flash drives, Troll Ads</li>
+                                            <li>Engine Blocks, Smuggling Machines</li>
+                                            <li>Offensive text on license plates</li>
+                                        </ul>
+                                    </div>
+                                    <div class="policy-card" style="background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.04); border-radius: 6px; padding: 12px; box-sizing: border-box;">
+                                        <h3 style="margin-top:0; font-size:12.5px; color:#ff9f0a; display:flex; align-items:center; gap:6px; font-family:var(--font-heading); font-weight:700;"><i class="fa-solid fa-circle-exclamation"></i> Rejection Only</h3>
+                                        <ul style="margin:8px 0 0 0; padding-left:16px; font-size:11px; color:var(--text-secondary); line-height:1.4;">
+                                            <li>Crowbar, All fabric, Animal/Armor skin</li>
+                                            <li>Head bag (except luminous), Air Horn</li>
+                                            <li>Barricades, Traps, Poison darts, Army Uniform</li>
+                                            <li>Tracking sensors, Dangerous razors</li>
+                                            <li>Body armor, Body armor plates</li>
+                                            <li>Cocaine ingredients, Paper for money</li>
+                                            <li>Satellite dish, Forest mushroom tincture</li>
+                                            <li>First Aid Kits, all pills, Food items</li>
+                                        </ul>
+                                    </div>
+                                    <div class="policy-card" style="background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.04); border-radius: 6px; padding: 12px; box-sizing: border-box;">
+                                        <h3 style="margin-top:0; font-size:12.5px; color:#ff453a; display:flex; align-items:center; gap:6px; font-family:var(--font-heading); font-weight:700;"><i class="fa-solid fa-rectangle-xmark"></i> Banned Content</h3>
+                                        <ul style="margin:8px 0 0 0; padding-left:16px; font-size:11px; color:var(--text-secondary); line-height:1.4;">
+                                            <li>Grand Coins, Battlepass tickets</li>
+                                            <li>Branded armor or Hype Body armor</li>
+                                            <li>Gangs, Nationality, Unofficial family names</li>
+                                            <li>Drugs &amp; Medkits/pills</li>
+                                            <li>Food items (except raw/cooked fish)</li>
+                                            <li>Birthday or celebratory advertisements</li>
+                                            <li>Sexual content, hints or prostitution</li>
+                                            <li>Sale of people, slaves or kidnapping</li>
+                                            <li>State Org Leaders &amp; deputy leaders</li>
+                                        </ul>
+                                    </div>
+                                    <div class="policy-card" style="background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.04); border-radius: 6px; padding: 12px; box-sizing: border-box;">
+                                        <h3 style="margin-top:0; font-size:12.5px; color:#60a5fa; display:flex; align-items:center; gap:6px; font-family:var(--font-heading); font-weight:700;"><i class="fa-solid fa-circle-info"></i> General Rules</h3>
+                                        <ul style="margin:8px 0 0 0; padding-left:16px; font-size:11px; color:var(--text-secondary); line-height:1.4;">
+                                            <li><strong>Format:</strong> Start with: <code>Buying</code>, <code>Selling</code>, <code>Trading</code>, <code>Selling or trading</code>.</li>
+                                            <li><strong>Prices:</strong> Buying = <code>Budget:</code>, Selling = <code>Price:</code>. Capitalize first letter, use <code>$</code>. Write out full values (no 'k'/'M').</li>
+                                            <li><strong>Limits:</strong> Max 1 vehicle or 3 items.</li>
+                                            <li><strong>Banned Places:</strong> Mega Mall, Gang HQ, Black Market, Ghetto, State Offices.</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+
+                    
+                    <!-- Tab 5: Admin Panel (Trained Corrections & Templates) -->
+                    <div class="tab-content" id="tab-admin">
+                        <!-- Password Protection Overlay if not authenticated -->
+                        <div id="admin-auth-container" class="admin-auth-container">
+                            <div class="auth-card">
+                                <i class="fa-solid fa-lock auth-icon"></i>
+                                <h3>Creator Authorization Required</h3>
+                                <p class="section-desc" style="text-align: center;">This panel is restricted to the system creator (Dopamine). Please enter the admin passcode to unlock.</p>
+                                <div class="form-group" style="margin-top: 15px; width: 100%; max-width: 320px;">
+                                    <input type="password" id="admin-passcode-input" placeholder="Enter Admin Passcode" style="text-align: center; font-family: monospace;">
+                                </div>
+                                <button type="button" id="btn-admin-auth" class="btn-action glow-red" style="margin-top: 15px; max-width: 200px;">
+                                    <i class="fa-solid fa-unlock"></i> Unlock Panel
+                                </button>
+                                <div id="admin-auth-error" class="auth-error hide">Invalid passcode. Access Denied.</div>
+                            </div>
+                        </div>
+
+                        <!-- Admin Panel Content (Visible only when authenticated) -->
+                        <div id="admin-panel-content" class="admin-panel-content hide">
+                            <!-- Admin Tabs Navigation -->
+                            <div class="admin-tabs-nav">
+                                <button type="button" class="admin-tab-btn active" data-target="tab-pending-requests">
+                                    <i class="fa-solid fa-user-plus"></i> Pending Requests
+                                </button>
+                                <button type="button" class="admin-tab-btn" data-target="tab-api-vault">
+                                    <i class="fa-solid fa-vault" style="color: #a78bfa;"></i> API Key Vault
+                                </button>
+                                <button type="button" class="admin-tab-btn" data-target="tab-history">
+                                    <i class="fa-solid fa-clipboard-list"></i> Logs
+                                </button>
+                                <button type="button" class="admin-tab-btn" data-target="tab-users">
+                                    <i class="fa-solid fa-users"></i> Users
+                                </button>
+                            </div>
+
+                            <!-- Tab 1: Pending Access Requests -->
+                            <div id="tab-pending-requests" class="admin-tab-content">
+                                <p class="section-desc">Manage system access requests from users (one access per hardware). Approve requests to grant them system access.</p>
+                                <div id="admin-access-requests-container" class="access-requests-list" style="margin-top: 15px; display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));">
+                                    <div class="no-requests-msg" style="grid-column: 1 / -1; text-align: center; padding: 30px; color: var(--text-muted); border: 1px dashed var(--border-color); border-radius: 8px; background: rgba(255,255,255,0.01);">
+                                        <i class="fa-solid fa-users-slash" style="font-size: 24px; margin-bottom: 10px; display: block; color: var(--text-muted);"></i>
+                                        No pending access requests.
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Tab 4: System Logs -->
+                            <div id="tab-history" class="admin-tab-content hide">
+                                <h4 style="margin: 0; font-family: var(--font-heading); color: var(--text-color); font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 8px;"><i class="fa-solid fa-clipboard-list"></i> System Logs & Activity</h4>
+                                <p class="section-desc">Monitor processed advertisements, user registrations, and system access status.</p>
+                                
+                                <!-- Logs Analytics Dashboard Grid -->
+                                <div class="analytics-grid" style="margin-top: 15px;">
+                                    <div class="metric-card">
+                                        <div class="metric-icon-wrapper">
+                                            <i class="fa-solid fa-database"></i>
+                                        </div>
+                                        <div class="metric-info">
+                                            <span class="metric-val" id="metric-total-logs">—</span>
+                                            <span class="metric-lbl">Total Logs Audited</span>
+                                        </div>
+                                    </div>
+                                    <div class="metric-card">
+                                        <div class="metric-icon-wrapper">
+                                            <i class="fa-solid fa-user-clock"></i>
+                                        </div>
+                                        <div class="metric-info">
+                                            <span class="metric-val" id="metric-pending-requests">—</span>
+                                            <span class="metric-lbl">Pending Invites</span>
+                                        </div>
+                                    </div>
+                                    <div class="metric-card">
+                                        <div class="metric-icon-wrapper">
+                                            <i class="fa-solid fa-paint-roller"></i>
+                                        </div>
+                                        <div class="metric-info">
+                                            <span class="metric-val" id="metric-active-theme">Standard</span>
+                                            <span class="metric-lbl">Active Theme Skin</span>
+                                        </div>
+                                    </div>
+                                    <div class="metric-card">
+                                        <div class="metric-icon-wrapper">
+                                            <i class="fa-solid fa-key"></i>
+                                        </div>
+                                        <div class="metric-info">
+                                            <span class="metric-val" id="metric-key-health">—</span>
+                                            <span class="metric-lbl">Gemini Core Keys</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="log-subtabs-nav" style="display: flex; gap: 10px; margin-top: 12px; margin-bottom: 12px;">
+                                    <button type="button" class="log-subtab-btn active" data-log-type="ads">
+                                        <i class="fa-solid fa-message"></i> Ads Processed
+                                    </button>
+                                    <button type="button" class="log-subtab-btn" data-log-type="users">
+                                        <i class="fa-solid fa-user-clock"></i> User Joins & Access
+                                    </button>
+                                    <button type="button" class="log-subtab-btn" data-log-type="system">
+                                        <i class="fa-solid fa-list-check"></i> System &amp; Audit Logs
+                                    </button>
+                                </div>
+
+                                <div class="history-controls" style="display: flex; gap: 10px; margin-bottom: 15px; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+                                    <button type="button" id="btn-refresh-history" class="btn btn-secondary" style="background-color: var(--color-info); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; margin: 0; height: 36px;"><i class="fa-solid fa-sync"></i> Refresh Logs</button>
+                                    
+                                    <div class="logs-search-container" style="flex: 1; max-width: 400px; min-width: 250px; display: flex; align-items: center; background: rgba(0, 0, 0, 0.25); padding: 0 12px; border: 1px solid var(--border-color); border-radius: 6px; height: 36px;">
+                                        <i class="fa-solid fa-magnifying-glass" style="color: var(--text-secondary); font-size: 13px; margin-right: 8px;"></i>
+                                        <input type="text" id="logs-search-input" placeholder="Search logs (editor, ID, action, details)..." style="background: transparent; border: none; color: white; width: 100%; outline: none; font-size: 13px; font-family: 'Outfit', sans-serif;">
+                                        <button type="button" id="btn-clear-logs-search" class="hide" style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; padding: 0 4px; display: inline-flex; align-items: center;"><i class="fa-solid fa-circle-xmark"></i></button>
+                                    </div>
+                                </div>
+
+                                <!-- Sub-tab Content: Ads Processed -->
+                                <div id="log-content-ads" class="log-subtab-content">
+                                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
+                                        <table class="leaders-table" style="margin: 0;">
+                                            <thead>
+                                                <tr>
+                                                    <th style="width: 140px;">Timestamp</th>
+                                                    <th style="width: 120px;">Editor</th>
+                                                    <th style="width: 80px;">ID</th>
+                                                    <th>Raw Input</th>
+                                                    <th>Formatted Output</th>
+                                                    <th style="width: 100px;">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="history-table-body">
+                                                <tr>
+                                                    <td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 20px;">Click Refresh Logs to load.</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <!-- Sub-tab Content: User Joins & Access Logs -->
+                                <div id="log-content-users" class="log-subtab-content hide">
+                                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
+                                        <table class="leaders-table" style="margin: 0;">
+                                            <thead>
+                                                <tr>
+                                                    <th style="width: 140px;">Timestamp</th>
+                                                    <th style="width: 150px;">User Name</th>
+                                                    <th style="width: 80px;">ID</th>
+                                                    <th style="width: 80px;">Server</th>
+                                                    <th style="width: 120px;">Role</th>
+                                                    <th style="width: 100px;">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="user-logs-table-body">
+                                                <tr>
+                                                    <td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 20px;">Click Refresh Logs to load.</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <!-- Sub-tab Content: System & Audit Logs -->
+                                <div id="log-content-system" class="log-subtab-content hide">
+                                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
+                                        <table class="leaders-table" style="margin: 0;">
+                                            <thead>
+                                                <tr>
+                                                    <th style="width: 140px;">Timestamp</th>
+                                                    <th style="width: 150px;">Actor Name</th>
+                                                    <th style="width: 80px;">ID</th>
+                                                    <th style="width: 100px;">Module</th>
+                                                    <th style="width: 140px;">Action</th>
+                                                    <th>Details</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="system-logs-table-body">
+                                                <tr>
+                                                    <td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 20px;">Click Refresh Logs to load.</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+
+
+                            <!-- Tab 1b: Authorized Users -->
+                            <div id="tab-users" class="admin-tab-content hide">
+                                <p class="section-desc">View and manage authorized users who have access to the system. You can revoke their access at any time.</p>
+                                <div id="admin-users-list-container" class="access-requests-list" style="margin-top: 15px; display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));">
+                                    <div class="no-requests-msg" style="grid-column: 1 / -1; text-align: center; padding: 30px; color: var(--text-muted); border: 1px dashed var(--border-color); border-radius: 8px; background: rgba(255,255,255,0.01);">
+                                        <i class="fa-solid fa-users-slash" style="font-size: 24px; margin-bottom: 10px; display: block; color: var(--text-muted);"></i>
+                                        No authorized users found.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Tab 7: API Key Vault -->
+                            <div id="tab-api-vault" class="admin-tab-content hide">
+                                <div id="ai-assistant-dashboard-content" style="display: flex; gap: 20px; flex-wrap: wrap; align-items: stretch; margin-top: 10px;">
+                                    
+                                    <!-- HIDDEN AI Sandbox (Playground) - KEPT FOR SCRIPT COMPATIBILITY -->
+                                    <div id="sandbox-compat-wrapper" style="display: none !important;">
+                                        <textarea id="ai-sandbox-raw"></textarea>
+                                        <select id="ai-sandbox-category"><option value="auto">auto</option></select>
+                                        <textarea id="ai-sandbox-output-text"></textarea>
+                                        <div id="ai-sandbox-output-reason"></div>
+                                        <button type="button" id="btn-ai-sandbox-test"></button>
+                                        <button type="button" id="btn-ai-sandbox-copy"></button>
+                                        <button type="button" id="btn-ai-sandbox-train"></button>
+                                        <textarea id="ai-custom-prompt"></textarea>
+                                    </div>
+
+                                    <!-- Left Card: AI Core Status -->
+                                    <div class="admin-card" style="flex: 1; min-width: 320px; background: rgba(22, 22, 28, 0.4); border: 1px solid var(--border-color); padding: 20px; border-radius: var(--radius-md); display: flex; flex-direction: column; justify-content: space-between;">
+                                        <div>
+                                            <h4 style="margin: 0 0 4px 0; font-family: var(--font-heading); color: var(--text-color); font-size: 13px; letter-spacing: 0.5px; text-transform: uppercase; display: flex; align-items: center; gap: 6px;">
+                                                <i class="fa-solid fa-microchip" style="color: #a78bfa;"></i> AI Assistant Core
+                                            </h4>
+                                            <p class="section-desc" style="margin: 0 0 12px 0; font-size: 11.5px; opacity: 0.65; line-height: 1.4;">Monitor live API transaction windows and active credentials health.</p>
+                                            
+                                            <!-- Status Indicator -->
+                                            <div id="ai-gemini-status-container" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--text-secondary); background: rgba(255, 255, 255, 0.02); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.04); margin-bottom: 12px;">
+                                                <div style="display: flex; align-items: center; gap: 8px;">
+                                                    <span id="ai-gemini-status-indicator" style="width: 8px; height: 8px; border-radius: 50%; background: #ff453a; display: inline-block;"></span>
+                                                    <span id="ai-gemini-status-text">Disconnected (No Key)</span>
+                                                </div>
+                                                <div id="active-key-display-wrapper" style="display: none; align-items: center; gap: 6px; background: rgba(0,0,0,0.25); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.03);">
+                                                    <span id="active-key-masked-text" style="font-family: var(--font-mono, monospace); font-size: 10px; color: var(--text-secondary); letter-spacing: 1px;">••••••••••••••••</span>
+                                                    <button type="button" id="btn-active-key-reveal" title="Show/Hide Active Key" style="background: none; border: none; padding: 2px; color: var(--text-muted); cursor: pointer; font-size: 9px; display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; transition: color 0.2s ease;"><i class="fa-solid fa-eye-slash"></i></button>
+                                                </div>
+                                            </div>
+
+                                            <!-- API Usage Tracker -->
+                                            <div id="ai-usage-tracker" style="margin-bottom: 15px; background: rgba(255, 255, 255, 0.02); padding: 10px 12px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.04);">
+                                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                                    <span style="font-size: 9.5px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 4px;">
+                                                        <i class="fa-solid fa-chart-simple" style="font-size: 9px; color: #a78bfa;"></i> API Rate Limit (1-Min Window)
+                                                    </span>
+                                                    <span id="ai-usage-count" style="font-size: 10px; color: var(--text-secondary); font-weight: 600; font-family: var(--font-mono, monospace);">0 / 15 requests</span>
+                                                </div>
+                                                <div style="width: 100%; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.06); overflow: hidden; position: relative; margin-bottom: 6px;">
+                                                    <div id="ai-usage-bar-fill" style="height: 100%; border-radius: 3px; background: linear-gradient(90deg, #30d158, #34d399); width: 0%; transition: width 0.3s ease, background 0.3s ease; box-shadow: 0 0 6px rgba(48, 209, 88, 0.3);"></div>
+                                                </div>
+                                                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; color: var(--text-muted);">
+                                                    <span id="ai-usage-status">Resets in 60s</span>
+                                                    <span id="ai-usage-daily-count">Daily Total: 0 / 1500</span>
+                                                </div>
+                                            </div>
+
+                                            <!-- Theme Selector Customizer -->
+                                            <div id="theme-selector-section" style="margin-top: 15px; background: rgba(255, 255, 255, 0.02); padding: 10px 12px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.04);">
+                                                <span style="font-size: 9.5px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 4px; margin-bottom: 8px;">
+                                                    <i class="fa-solid fa-palette" style="font-size: 9px; color: #a78bfa;"></i> Application Theme Customizer
+                                                </span>
+                                                <div class="theme-selector-grid">
+                                                    <div class="theme-select-card active" data-theme="dark" title="Standard Dark Theme">
+                                                        <span style="font-size: 10px; font-weight: 600; color: #f5f5f7;">Standard</span>
+                                                        <div class="theme-preview-dots">
+                                                            <div class="theme-dot" style="background: #ff3b30;"></div>
+                                                            <div class="theme-dot" style="background: #0a0b10;"></div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="theme-select-card" data-theme="synthwave" title="Cyberpunk Synthwave Theme">
+                                                        <span style="font-size: 10px; font-weight: 600; color: #f5f5f7;">Synthwave</span>
+                                                        <div class="theme-preview-dots">
+                                                            <div class="theme-dot" style="background: #ec4899;"></div>
+                                                            <div class="theme-dot" style="background: #0f051d;"></div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="theme-select-card" data-theme="matrix" title="Emerald Matrix Theme">
+                                                        <span style="font-size: 10px; font-weight: 600; color: #f5f5f7;">Matrix</span>
+                                                        <div class="theme-preview-dots">
+                                                            <div class="theme-dot" style="background: #30d158;"></div>
+                                                            <div class="theme-dot" style="background: #020703;"></div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="theme-select-card" data-theme="nordic" title="Nordic Ice Theme">
+                                                        <span style="font-size: 10px; font-weight: 600; color: #f5f5f7;">Nordic</span>
+                                                        <div class="theme-preview-dots">
+                                                            <div class="theme-dot" style="background: #0ea5e9;"></div>
+                                                            <div class="theme-dot" style="background: #0a0e17;"></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Right Card: API Key Settings & Backup Vault -->
+                                    <div class="admin-card" style="flex: 1.2; min-width: 380px; background: rgba(22, 22, 28, 0.4); border: 1px solid var(--border-color); padding: 20px; border-radius: var(--radius-md); display: flex; flex-direction: column; justify-content: space-between;">
+                                        <div>
+                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                                <h4 style="margin: 0; font-family: var(--font-heading); color: var(--text-color); font-size: 13px; letter-spacing: 0.5px; text-transform: uppercase; display: flex; align-items: center; gap: 6px;">
+                                                    <i class="fa-solid fa-vault" style="color: #a78bfa;"></i> API Key Backup Vault
+                                                </h4>
+                                                <label class="failover-switch-container" style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none;">
+                                                    <span style="font-size: 9px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px;">Auto-Failover</span>
+                                                    <input type="checkbox" id="toggle-ai-failover" checked style="display: none;">
+                                                    <div class="vault-switch-bg" style="width: 24px; height: 13px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.05); border-radius: 7px; position: relative; transition: all 0.3s ease;">
+                                                        <div class="vault-switch-knob" style="width: 9px; height: 9px; background: #8e8e93; border-radius: 50%; position: absolute; top: 1px; left: 1px; transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);"></div>
+                                                    </div>
+                                                </label>
+                                            </div>
+                                            <p class="section-desc" style="margin: 0 0 15px 0; font-size: 11.5px; opacity: 0.65; line-height: 1.4;">Store up to five backup Gemini API keys with independent locks, masking, clipboard integration, and sequential failover rotation.</p>
+
+                                            <!-- HIDDEN COMPATIBILITY ELEMENT -->
+                                            <div style="display: none !important;">
+                                                <input type="password" id="input-ai-gemini-key">
+                                                <button type="button" id="btn-toggle-ai-gemini-key-visibility"></button>
+                                            </div>
+
+                                            <div style="display: flex; flex-direction: column; gap: 6px;" id="api-vault-list">
+                                                <!-- Vault Row 1 -->
+                                                <div class="vault-row" data-slot="1" style="display: flex; gap: 4px; align-items: center; background: rgba(0,0,0,0.18); border: 1px solid rgba(255,255,255,0.03); border-radius: 6px; padding: 4px 6px; transition: all 0.25s ease;">
+                                                    <button type="button" class="btn-vault-activate" data-slot="1" title="Activate this key" style="background: none; border: none; padding: 0 4px; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px;">
+                                                        <i class="fa-regular fa-circle"></i>
+                                                    </button>
+                                                    <span style="font-size: 9px; font-weight: 700; color: var(--text-muted); width: 14px; text-align: center;">1</span>
+                                                    <input type="password" class="vault-key-input" data-slot="1" placeholder="Primary Gemini API Key" style="flex: 1; min-width: 0; background: transparent; border: none; outline: none; color: var(--text-primary); font-size: 11px; font-family: var(--font-mono, monospace); padding: 2px 4px;">
+                                                    <span class="vault-status-dot" data-slot="1" title="Untested" style="width: 5px; height: 5px; border-radius: 50%; background: rgba(255,255,255,0.15); flex-shrink: 0; margin-right: 4px;"></span>
+                                                    <div style="display: flex; gap: 2px; align-items: center; flex-shrink: 0;">
+                                                        <button type="button" class="btn-vault-visibility" data-slot="1" title="Show/Hide" style="background: none; border: none; padding: 4px; color: var(--text-muted); cursor: pointer; font-size: 10px; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center;"><i class="fa-solid fa-eye-slash"></i></button>
+                                                        <button type="button" class="btn-vault-copy" data-slot="1" title="Copy" style="background: none; border: none; padding: 4px; color: var(--text-muted); cursor: pointer; font-size: 10px; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center;"><i class="fa-solid fa-copy"></i></button>
+                                                        <button type="button" class="btn-vault-paste" data-slot="1" title="Paste" style="background: none; border: none; padding: 4px; color: var(--text-muted); cursor: pointer; font-size: 10px; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center;"><i class="fa-solid fa-paste"></i></button>
+                                                        <button type="button" class="btn-vault-test" data-slot="1" title="Test Key Health" style="background: none; border: none; padding: 4px; color: var(--text-muted); cursor: pointer; font-size: 10px; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center;"><i class="fa-solid fa-vial"></i></button>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Advanced Toggle Button -->
+                                                <button type="button" id="btn-toggle-backup-drawer" class="btn-vault-accordion">
+                                                    <span>Show Backup Keys (Auto-Failover)</span>
+                                                    <i class="fa-solid fa-chevron-down"></i>
+                                                </button>
+
+                                                <!-- Collapsible Backup Keys Drawer -->
+                                                <div class="vault-drawer" id="backup-keys-drawer">
+                                                    <!-- Vault Row 2 -->
+                                                    <div class="vault-row" data-slot="2" style="display: flex; gap: 4px; align-items: center; background: rgba(0,0,0,0.18); border: 1px solid rgba(255,255,255,0.03); border-radius: 6px; padding: 4px 6px; transition: all 0.25s ease;">
+                                                        <button type="button" class="btn-vault-activate" data-slot="2" title="Activate this key" style="background: none; border: none; padding: 0 4px; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px;">
+                                                            <i class="fa-regular fa-circle"></i>
+                                                        </button>
+                                                        <span style="font-size: 9px; font-weight: 700; color: var(--text-muted); width: 14px; text-align: center;">2</span>
+                                                        <input type="password" class="vault-key-input" data-slot="2" placeholder="Empty Slot 2" style="flex: 1; min-width: 0; background: transparent; border: none; outline: none; color: var(--text-primary); font-size: 11px; font-family: var(--font-mono, monospace); padding: 2px 4px;">
+                                                        <span class="vault-status-dot" data-slot="2" title="Untested" style="width: 5px; height: 5px; border-radius: 50%; background: rgba(255,255,255,0.15); flex-shrink: 0; margin-right: 4px;"></span>
+                                                        <div style="display: flex; gap: 2px; align-items: center; flex-shrink: 0;">
+                                                            <button type="button" class="btn-vault-visibility" data-slot="2" title="Show/Hide" style="background: none; border: none; padding: 4px; color: var(--text-muted); cursor: pointer; font-size: 10px; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center;"><i class="fa-solid fa-eye-slash"></i></button>
+                                                            <button type="button" class="btn-vault-copy" data-slot="2" title="Copy" style="background: none; border: none; padding: 4px; color: var(--text-muted); cursor: pointer; font-size: 10px; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center;"><i class="fa-solid fa-copy"></i></button>
+                                                            <button type="button" class="btn-vault-paste" data-slot="2" title="Paste" style="background: none; border: none; padding: 4px; color: var(--text-muted); cursor: pointer; font-size: 10px; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center;"><i class="fa-solid fa-paste"></i></button>
+                                                            <button type="button" class="btn-vault-test" data-slot="2" title="Test Key Health" style="background: none; border: none; padding: 4px; color: var(--text-muted); cursor: pointer; font-size: 10px; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center;"><i class="fa-solid fa-vial"></i></button>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Vault Row 3 -->
+                                                    <div class="vault-row" data-slot="3" style="display: flex; gap: 4px; align-items: center; background: rgba(0,0,0,0.18); border: 1px solid rgba(255,255,255,0.03); border-radius: 6px; padding: 4px 6px; transition: all 0.25s ease;">
+                                                        <button type="button" class="btn-vault-activate" data-slot="3" title="Activate this key" style="background: none; border: none; padding: 0 4px; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px;">
+                                                            <i class="fa-regular fa-circle"></i>
+                                                        </button>
+                                                        <span style="font-size: 9px; font-weight: 700; color: var(--text-muted); width: 14px; text-align: center;">3</span>
+                                                        <input type="password" class="vault-key-input" data-slot="3" placeholder="Empty Slot 3" style="flex: 1; min-width: 0; background: transparent; border: none; outline: none; color: var(--text-primary); font-size: 11px; font-family: var(--font-mono, monospace); padding: 2px 4px;">
+                                                        <span class="vault-status-dot" data-slot="3" title="Untested" style="width: 5px; height: 5px; border-radius: 50%; background: rgba(255,255,255,0.15); flex-shrink: 0; margin-right: 4px;"></span>
+                                                        <div style="display: flex; gap: 2px; align-items: center; flex-shrink: 0;">
+                                                            <button type="button" class="btn-vault-visibility" data-slot="3" title="Show/Hide" style="background: none; border: none; padding: 4px; color: var(--text-muted); cursor: pointer; font-size: 10px; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center;"><i class="fa-solid fa-eye-slash"></i></button>
+                                                            <button type="button" class="btn-vault-copy" data-slot="3" title="Copy" style="background: none; border: none; padding: 4px; color: var(--text-muted); cursor: pointer; font-size: 10px; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center;"><i class="fa-solid fa-copy"></i></button>
+                                                            <button type="button" class="btn-vault-paste" data-slot="3" title="Paste" style="background: none; border: none; padding: 4px; color: var(--text-muted); cursor: pointer; font-size: 10px; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center;"><i class="fa-solid fa-paste"></i></button>
+                                                            <button type="button" class="btn-vault-test" data-slot="3" title="Test Key Health" style="background: none; border: none; padding: 4px; color: var(--text-muted); cursor: pointer; font-size: 10px; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center;"><i class="fa-solid fa-vial"></i></button>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Vault Row 4 -->
+                                                    <div class="vault-row" data-slot="4" style="display: flex; gap: 4px; align-items: center; background: rgba(0,0,0,0.18); border: 1px solid rgba(255,255,255,0.03); border-radius: 6px; padding: 4px 6px; transition: all 0.25s ease;">
+                                                        <button type="button" class="btn-vault-activate" data-slot="4" title="Activate this key" style="background: none; border: none; padding: 0 4px; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px;">
+                                                            <i class="fa-regular fa-circle"></i>
+                                                        </button>
+                                                        <span style="font-size: 9px; font-weight: 700; color: var(--text-muted); width: 14px; text-align: center;">4</span>
+                                                        <input type="password" class="vault-key-input" data-slot="4" placeholder="Empty Slot 4" style="flex: 1; min-width: 0; background: transparent; border: none; outline: none; color: var(--text-primary); font-size: 11px; font-family: var(--font-mono, monospace); padding: 2px 4px;">
+                                                        <span class="vault-status-dot" data-slot="4" title="Untested" style="width: 5px; height: 5px; border-radius: 50%; background: rgba(255,255,255,0.15); flex-shrink: 0; margin-right: 4px;"></span>
+                                                        <div style="display: flex; gap: 2px; align-items: center; flex-shrink: 0;">
+                                                            <button type="button" class="btn-vault-visibility" data-slot="4" title="Show/Hide" style="background: none; border: none; padding: 4px; color: var(--text-muted); cursor: pointer; font-size: 10px; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center;"><i class="fa-solid fa-eye-slash"></i></button>
+                                                            <button type="button" class="btn-vault-copy" data-slot="4" title="Copy" style="background: none; border: none; padding: 4px; color: var(--text-muted); cursor: pointer; font-size: 10px; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center;"><i class="fa-solid fa-copy"></i></button>
+                                                            <button type="button" class="btn-vault-paste" data-slot="4" title="Paste" style="background: none; border: none; padding: 4px; color: var(--text-muted); cursor: pointer; font-size: 10px; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center;"><i class="fa-solid fa-paste"></i></button>
+                                                            <button type="button" class="btn-vault-test" data-slot="4" title="Test Key Health" style="background: none; border: none; padding: 4px; color: var(--text-muted); cursor: pointer; font-size: 10px; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center;"><i class="fa-solid fa-vial"></i></button>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Vault Row 5 -->
+                                                    <div class="vault-row" data-slot="5" style="display: flex; gap: 4px; align-items: center; background: rgba(0,0,0,0.18); border: 1px solid rgba(255,255,255,0.03); border-radius: 6px; padding: 4px 6px; transition: all 0.25s ease;">
+                                                        <button type="button" class="btn-vault-activate" data-slot="5" title="Activate this key" style="background: none; border: none; padding: 0 4px; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px;">
+                                                            <i class="fa-regular fa-circle"></i>
+                                                        </button>
+                                                        <span style="font-size: 9px; font-weight: 700; color: var(--text-muted); width: 14px; text-align: center;">5</span>
+                                                        <input type="password" class="vault-key-input" data-slot="5" placeholder="Empty Slot 5" style="flex: 1; min-width: 0; background: transparent; border: none; outline: none; color: var(--text-primary); font-size: 11px; font-family: var(--font-mono, monospace); padding: 2px 4px;">
+                                                        <span class="vault-status-dot" data-slot="5" title="Untested" style="width: 5px; height: 5px; border-radius: 50%; background: rgba(255,255,255,0.15); flex-shrink: 0; margin-right: 4px;"></span>
+                                                        <div style="display: flex; gap: 2px; align-items: center; flex-shrink: 0;">
+                                                            <button type="button" class="btn-vault-visibility" data-slot="5" title="Show/Hide" style="background: none; border: none; padding: 4px; color: var(--text-muted); cursor: pointer; font-size: 10px; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center;"><i class="fa-solid fa-eye-slash"></i></button>
+                                                            <button type="button" class="btn-vault-copy" data-slot="5" title="Copy" style="background: none; border: none; padding: 4px; color: var(--text-muted); cursor: pointer; font-size: 10px; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center;"><i class="fa-solid fa-copy"></i></button>
+                                                            <button type="button" class="btn-vault-paste" data-slot="5" title="Paste" style="background: none; border: none; padding: 4px; color: var(--text-muted); cursor: pointer; font-size: 10px; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center;"><i class="fa-solid fa-paste"></i></button>
+                                                            <button type="button" class="btn-vault-test" data-slot="5" title="Test Key Health" style="background: none; border: none; padding: 4px; color: var(--text-muted); cursor: pointer; font-size: 10px; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center;"><i class="fa-solid fa-vial"></i></button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div style="margin-top: 15px; display: flex; width: 100%;">
+                                            <button type="button" id="btn-ai-gemini-save" class="btn-action" style="width: 100%; padding: 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; height: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; margin: 0; background: linear-gradient(135deg, rgba(167,139,250,0.15), rgba(167,139,250,0.05)); border: 1px solid rgba(167,139,250,0.3); color: #a78bfa;">
+                                                <i class="fa-solid fa-floppy-disk"></i> Save Details
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                    <!-- Tab 8: Trained Full Ads -->
+                    <div class="tab-content" id="tab-translations">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <h4 style="margin: 0; font-family: var(--font-heading); color: var(--text-color); font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase;">Fixed Bug Mappings</h4>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <button type="button" id="btn-translations-refresh" class="btn-preset" style="padding: 4px 12px; font-size: 10px; font-weight: 700; text-transform: uppercase; height: 26px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; margin: 0; border-radius: 4px; width: auto; min-width: 100px; background: rgba(48, 209, 88, 0.1); border: 1px solid rgba(48, 209, 88, 0.2); color: #30d158;">
+                                    <i class="fa-solid fa-arrows-rotate"></i> Refresh
+                                </button>
+                                <button type="button" id="btn-admin-clear-all-translations" class="btn-action glow-red" style="padding: 4px 12px; font-size: 10px; font-weight: 700; text-transform: uppercase; height: 26px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; margin: 0; border-radius: 4px; width: auto; min-width: 160px;">
+                                    <i class="fa-solid fa-trash-can"></i> Clear All Mappings
+                                </button>
+                            </div>
+                        </div>
+                        <p class="section-desc">These are exact raw-to-corrected ad translation mappings created when you confirm manual corrections in triage. When an exact match is found, the correction is applied automatically.</p>
+                        
+                        <!-- Search Filter for Translations -->
+                        <div style="margin-top: 15px; margin-bottom: 15px; width: 100%; display: flex; gap: 10px; align-items: center;">
+                            <div style="position: relative; flex: 1;">
+                                <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: rgba(255,255,255,0.3); font-size: 12px;"></i>
+                                <input type="text" id="input-translations-search" placeholder="Search raw or corrected ads..." style="width: 100%; padding: 8px 10px 8px 30px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.25); color: var(--text-primary); font-size: 12px; font-family: var(--font-heading);">
+                            </div>
+                            <div id="translations-count-badge" class="badge" style="background: rgba(255, 255, 255, 0.05); color: var(--text-secondary); border-color: rgba(255,255,255,0.1); font-size: 11px; padding: 6px 12px;">Total: 0</div>
+                        </div>
+
+                        <div class="table-responsive" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px;">
+                            <table class="leaders-table" style="margin: 0; table-layout: fixed; width: 100%;">
+                                <thead>
+                                    <tr>
+                                        <th id="th-translations-raw" style="width: 35%;">Raw Ad (Input)</th>
+                                        <th id="th-translations-corr" style="width: 35%;">Corrected Ad (Output)</th>
+                                        <th id="th-translations-details" style="width: 20%;">Training Details</th>
+                                        <th id="th-translations-action" style="width: 10%; text-align: center;">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admin-translations-list">
+                                    <!-- Dynamic list of custom translation mappings -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+
+                    <!-- Tab: Bug reports Triage -->
+                    <div class="tab-content" id="tab-bug-triage">
+                        <!-- Lock Screen Overlay -->
+                        <div id="bug-triage-lock-screen" style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 60px 20px; min-height: 400px; background: rgba(0,0,0,0.15); border-radius: var(--radius-md); border: 1px solid var(--border-color); margin-top: 15px;">
+                            <div style="background: rgba(255, 69, 58, 0.05); border: 1px solid rgba(255, 69, 58, 0.15); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 20px; box-shadow: 0 0 20px rgba(255, 69, 58, 0.15);">
+                                <i class="fa-solid fa-lock" style="font-size: 32px; color: #ff453a;"></i>
+                            </div>
+                            <h2 style="font-family: var(--font-heading); color: var(--text-color); margin: 0 0 10px 0; font-size: 22px; font-weight: 700; letter-spacing: 0.5px;">Access Locked</h2>
+                            <p style="color: var(--text-muted); font-size: 14px; max-width: 420px; line-height: 1.5; margin: 0 0 24px 0;">The Bug reports training triage is reserved exclusively for Admins and Super Admins. Please authenticate to unlock.</p>
+                            <button type="button" class="btn-action glow-red" id="btn-bug-unlock-login" style="padding: 10px 24px; font-size: 12px; font-weight: 700; text-transform: uppercase; height: 40px; display: inline-flex; align-items: center; gap: 8px;">
+                                <i class="fa-solid fa-key"></i> Authenticate Admin
+                            </button>
+                        </div>
+
+                        <!-- Active Bug Triage Content (Hidden by default, shown when authenticated) -->
+                        <div id="bug-triage-active-content" class="hide" style="margin-top: 15px;">
+                            <p class="section-desc" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                                <span>Review automatically captured bug reports, analyze raw vs expected outputs, and train the correction engine in one click.</span>
+                                <div style="display: flex; gap: 8px; align-items: center;">
+                                    <button type="button" id="btn-triage-templates" style="background: rgba(167, 139, 250, 0.05); border: 1px solid rgba(167, 139, 250, 0.15); color: #a78bfa; padding: 6px 14px; border-radius: var(--radius-sm); font-family: var(--font-heading); font-size: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s ease; letter-spacing: 0.3px;">
+                                        <i class="fa-solid fa-file-invoice"></i> Manage Templates
+                                    </button>
+                                    <button type="button" id="btn-triage-clear-all" style="background: rgba(255, 59, 48, 0.05); border: 1px solid rgba(255, 59, 48, 0.15); color: #ff453a; padding: 6px 14px; border-radius: var(--radius-sm); font-family: var(--font-heading); font-size: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s ease; letter-spacing: 0.3px;">
+                                        <i class="fa-solid fa-trash-can"></i> Clear All
+                                    </button>
+                                    <button type="button" id="btn-triage-refresh" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: var(--text-secondary); padding: 6px 14px; border-radius: var(--radius-sm); font-family: var(--font-heading); font-size: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s ease; letter-spacing: 0.3px;">
+                                        <i class="fa-solid fa-arrows-rotate"></i> Refresh
+                                    </button>
+                                </div>
+                            </p>
+
+                            <div id="admin-triage-list-container" style="margin-top: 15px; display: grid; gap: 15px; grid-template-columns: repeat(auto-fill, minmax(370px, 1fr));">
+                                <div class="no-requests-msg" style="grid-column: 1 / -1; text-align: center; padding: 40px 20px; color: var(--text-muted); border: 1px dashed var(--border-color); border-radius: 8px; background: rgba(255,255,255,0.01);">
+                                    <i class="fa-solid fa-wand-magic-sparkles" style="font-size: 28px; margin-bottom: 12px; display: block; color: var(--text-muted); opacity: 0.5;"></i>
+                                    <span style="font-size: 13px;">Click Refresh to load active bug reports.</span>
+                                </div>
+                            </div>
+
+                            <!-- Custom Templates Collapsible Drawer -->
+                            <div id="bug-triage-templates-drawer" class="templates-drawer">
+                                <!-- Custom Templates Section -->
+                                <div style="margin-top: 10px;">
+                                    <h3 style="font-family: var(--font-heading); color: var(--text-color); font-size: 13.5px; font-weight: 700; text-transform: uppercase; margin: 0 0 15px 0; display: flex; align-items: center; gap: 8px; letter-spacing: 0.5px;">
+                                        <i class="fa-solid fa-file-invoice" style="color: #a78bfa;"></i> Custom Templates Management
+                                    </h3>
+                                    <p class="section-desc" style="margin: 0 0 15px 0;">Add and train custom advertisement templates with specific categories and optional shorthands for instant clipboard corrections.</p>
+                                    
+                                    <div style="display: flex; gap: 24px; flex-wrap: wrap; align-items: stretch;">
+                                        <!-- Left side: Training Form -->
+                                        <div class="admin-card" style="flex: 1; min-width: 320px; background: rgba(22, 22, 28, 0.4); border: 1px solid var(--border-color); padding: 20px; border-radius: var(--radius-md); display: flex; flex-direction: column; justify-content: space-between;">
+                                            <div>
+                                                <h4 style="margin: 0 0 12px 0; font-family: var(--font-heading); color: var(--text-color); font-size: 11.5px; letter-spacing: 0.5px; text-transform: uppercase; display: flex; align-items: center; gap: 6px;">
+                                                    <i class="fa-solid fa-plus-circle" style="color: #a78bfa;"></i> Train New Template
+                                                </h4>
+                                                <form id="form-admin-template" class="admin-form" style="margin-top: 0; display: flex; flex-direction: column; gap: 12px;">
+                                                    <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
+                                                        <label for="template-text" style="font-size: 10px; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Template Output Text</label>
+                                                        <textarea id="template-text" placeholder="e.g. Upgrade your style this week at Clothing Shop n1 (GPS 31) ! Special offers..." rows="2" required style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.25); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); padding: 8px 10px; font-family: inherit; font-size: 12px; outline: none; transition: border-color 0.2s ease;"></textarea>
+                                                    </div>
+                                                    <div class="form-row" style="display: flex; gap: 12px; margin-top: 2px;">
+                                                        <div class="form-group col-6" style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+                                                            <label for="template-category" style="font-size: 10px; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Category</label>
+                                                            <select id="template-category" required style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.25); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); padding: 8px 10px; font-size: 12px; outline: none;">
+                                                                <option value="Services">Services</option>
+                                                                <option value="Discounts">Discounts</option>
+                                                                <option value="Real Estate">Real Estate</option>
+                                                                <option value="Vehicles">Vehicles</option>
+                                                                <option value="Jobs">Jobs</option>
+                                                                <option value="Dating">Dating</option>
+                                                                <option value="Buy">Buy</option>
+                                                                <option value="Other">Other</option>
+                                                            </select>
+                                                        </div>
+                                                        <div class="form-group col-6" style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+                                                            <label for="template-shorthand" style="font-size: 10px; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Shorthand (Optional)</label>
+                                                            <input type="text" id="template-shorthand" placeholder="e.g. 31 t1" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.25); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); padding: 8px 10px; font-size: 12px; outline: none;">
+                                                        </div>
+                                                    </div>
+                                                    <div class="form-row" style="margin-top: 10px; text-align: right;">
+                                                        <button type="submit" class="btn-action glow-red" style="max-width: 180px; padding: 8px 16px; font-size: 11px; height: 34px;">
+                                                            <i class="fa-solid fa-plus"></i> Train Template
+                                                        </button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Right side: Active Templates Directory -->
+                                        <div class="admin-card" style="flex: 1.3; min-width: 380px; background: rgba(22, 22, 28, 0.4); border: 1px solid var(--border-color); padding: 20px; border-radius: var(--radius-md); display: flex; flex-direction: column;">
+                                            <h4 style="margin: 0 0 12px 0; font-family: var(--font-heading); color: var(--text-color); font-size: 11.5px; letter-spacing: 0.5px; text-transform: uppercase; display: flex; align-items: center; gap: 6px;">
+                                                <i class="fa-solid fa-list" style="color: #a78bfa;"></i> Active Trained Templates
+                                            </h4>
+                                            <div class="table-responsive" style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; flex-grow: 1; background: rgba(0,0,0,0.15);">
+                                                <table class="leaders-table" style="margin: 0; width: 100%; border-collapse: collapse; font-size: 12px;">
+                                                    <thead>
+                                                        <tr style="border-bottom: 1px solid var(--border-color); background: rgba(0,0,0,0.25);">
+                                                            <th style="padding: 10px; text-align: left; color: var(--text-secondary); font-weight: 600;">Template Text</th>
+                                                            <th style="padding: 10px; text-align: left; color: var(--text-secondary); font-weight: 600; width: 85px;">Category</th>
+                                                            <th style="padding: 10px; text-align: left; color: var(--text-secondary); font-weight: 600; width: 85px;">Shorthand</th>
+                                                            <th style="padding: 10px; text-align: center; color: var(--text-secondary); font-weight: 600; width: 60px;">Action</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody id="admin-template-list">
+                                                        <!-- Dynamic list of custom templates -->
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-content" id="tab-contact">
+                        <div class="contact-tab-container" style="display: flex; gap: 30px; justify-content: center; align-items: stretch; flex-wrap: wrap; max-width: 1200px; margin: 0 auto; padding: 40px 20px;">
+                            <!-- Left: Contact Card -->
+                            <div class="contact-card" style="flex: 1; min-width: 320px; max-width: 500px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+                                <div class="contact-avatar-wrapper">
+                                    <div class="contact-pulse-ring"></div>
+                                    <div class="contact-icon-circle">
+                                        <i class="fa-solid fa-headset"></i>
+                                    </div>
+                                </div>
+                                <h2>Get in Touch</h2>
+                                <p class="contact-subtitle">Have suggestions, feedback, or found a bug?</p>
+                                <p class="contact-subtext">I'd love to hear from you!</p>
+                                <a href="https://discord.com/users/776892627122520114" target="_blank" class="btn-action glow-red" style="text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 10px; width: 100%; max-width: 280px; height: 48px; border-radius: var(--radius-md); font-family: var(--font-heading); font-weight: 700; font-size: 14.5px; text-transform: uppercase; letter-spacing: 0.5px;">
+                                    <i class="fa-brands fa-discord" style="font-size: 18px;"></i> Contact on Discord
+                                </a>
+                            </div>
+
+                            <!-- Right: Special Thanks & Credits Card -->
+                            <div class="contact-card credits-card" style="flex: 1; min-width: 320px; max-width: 500px; display: flex; flex-direction: column; align-items: center; text-align: center; border-color: rgba(255, 59, 48, 0.2); background: linear-gradient(135deg, rgba(22, 22, 28, 0.9) 0%, rgba(22, 22, 28, 0.7) 100%);">
+                                <div class="contact-avatar-wrapper" style="margin-bottom: 24px;">
+                                    <div class="contact-icon-circle" style="border-color: rgba(255, 59, 48, 0.25); box-shadow: 0 0 15px rgba(255, 59, 48, 0.1);">
+                                        <i class="fa-solid fa-heart" style="color: var(--color-primary); filter: drop-shadow(0 0 6px rgba(255, 59, 48, 0.5));"></i>
+                                    </div>
+                                </div>
+                                <h2>Key Collaborators</h2>
+                                <p class="contact-subtitle" style="margin-bottom: 24px; max-width: 400px; font-size: 14px; line-height: 1.5;">This project could not have reached this level without the dedication, suggestions, testing, and support of these incredible contributors:</p>
+                                
+                                <div class="credits-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; width: 100%; max-width: 420px; margin-bottom: 20px;">
+                                    <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 10px; border-radius: var(--radius-sm); font-family: var(--font-heading); font-weight: 600; font-size: 13px; color: var(--text-primary); transition: all 0.2s ease;">Anvy Rivera</div>
+                                    <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 10px; border-radius: var(--radius-sm); font-family: var(--font-heading); font-weight: 600; font-size: 13px; color: var(--text-primary); transition: all 0.2s ease;">Eve Rivera</div>
+                                    <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 10px; border-radius: var(--radius-sm); font-family: var(--font-heading); font-weight: 600; font-size: 13px; color: var(--text-primary); transition: all 0.2s ease;">Sanu Rivera</div>
+                                    <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 10px; border-radius: var(--radius-sm); font-family: var(--font-heading); font-weight: 600; font-size: 13px; color: var(--text-primary); transition: all 0.2s ease;">Bukku Riviera</div>
+                                    <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 10px; border-radius: var(--radius-sm); font-family: var(--font-heading); font-weight: 600; font-size: 13px; color: var(--text-primary); transition: all 0.2s ease;">Henry William</div>
+                                    <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 10px; border-radius: var(--radius-sm); font-family: var(--font-heading); font-weight: 600; font-size: 13px; color: var(--text-primary); transition: all 0.2s ease;">Ace Verlice</div>
+                                    <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 10px; border-radius: var(--radius-sm); font-family: var(--font-heading); font-weight: 600; font-size: 13px; color: var(--text-primary); transition: all 0.2s ease;">Yash Riviera</div>
+                                    <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 10px; border-radius: var(--radius-sm); font-family: var(--font-heading); font-weight: 600; font-size: 13px; color: var(--text-primary); transition: all 0.2s ease;">Yassen Riviera</div>
+                                </div>
+                                <p class="contact-subtext" style="margin: 0; font-size: 11px; opacity: 0.6; letter-spacing: 0.5px; text-transform: uppercase;">Menders & Moderators of the System</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+        
+        <footer class="app-footer">
+            <span style="opacity: 0.6;">LifeInvader</span> &middot; EN3 Internal Ad Processing System &middot; &copy; 2026
+        </footer>
+    </div>
+
+    <!-- Application Script -->
+    <script src="js/db.js"></script><script src="js/engine.js"></script><script src="js/ui.js"></script>
+    <script>
+        // Proactively unregister any previously registered Service Workers to ensure it behaves purely as a simple website
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(registrations => {
+                for (const registration of registrations) {
+                    registration.unregister()
+                        .then(success => success && console.log('Previous service worker unregistered successfully.'));
+                }
+            }).catch(err => console.error('Error clearing service workers:', err));
+        }
+    </script>
+</body>
+</html>

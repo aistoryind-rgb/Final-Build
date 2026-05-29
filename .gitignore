@@ -1,0 +1,5 @@
+# Local history / backups
+*~
+*.log
+.vscode/
+.firebase/
